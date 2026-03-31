@@ -21,7 +21,8 @@ It works like a **mini Power BI + AI system**, allowing users to upload any data
 
 ---
 
-🌐 Live Demo: https://ai-data-analyst-dashboard-ptkymvsappfff8pvytclvqo.streamlit.app/
+# 🌐 Live Demo: 
+https://ai-data-analyst-dashboard-ptkymvsappfff8pvytclvqo.streamlit.app/
 
 
 ## Features
