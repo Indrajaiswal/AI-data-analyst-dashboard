@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import io
 import base64
 
-# ------------------- Optional Libraries -------------------
+# Optional Libraries
 try:
     from wordcloud import WordCloud
     wordcloud_available = True
@@ -23,7 +23,7 @@ try:
 except ModuleNotFoundError:
     prophet_available = False
 
-# ------------------- Custom Modules -------------------
+# Custom Modules
 from data_analysis import load_data, clean_data
 from visualization import (
     plot_histogram, plot_correlation, plot_scatter,
@@ -38,16 +38,14 @@ import plotly.express as px
 
 # ------------------- Page Config -------------------
 st.set_page_config(page_title="Enterprise AI Dashboard", page_icon="📊", layout="wide")
-st.title("🚀 AI Data Analyst (Auto Data Analysis Tool)")
 
 # ------------------- PREMIUM CSS -------------------
 st.markdown("""
 <style>
 /* App background */
 [data-testid="stAppViewContainer"] {
-   background: linear-gradient(135deg, #a78bfa, #7c3aed);
-}
-
+background: linear-gradient(#a29bfe, #6c5ce7)
+            }
 
 /* Sidebar */
 [data-testid="stSidebar"] {
@@ -57,11 +55,12 @@ st.markdown("""
     color: white !important;
 }
 
-/* Titles */
+/* Title */
 h1, h2, h3, h4, h5, h6 {
     color: #1e3a8a !important;
     font-weight: 700;
 }
+            
 
 /* KPI Cards */
 [data-testid="metric-container"] {
@@ -70,12 +69,10 @@ h1, h2, h3, h4, h5, h6 {
     padding: 15px;
     box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
     border-left: 5px solid #3b82f6;
-}
-[data-testid="metric-container"] * {
-    color: black !important;  /* fixes white text issue */
+    color: black !important;
 }
 
-/* AI Insights and Text */
+/* Text inside metrics / insights */
 .stText, .stMarkdown {
     color: black !important;
 }
@@ -92,18 +89,6 @@ h1, h2, h3, h4, h5, h6 {
     background: linear-gradient(90deg, #2563eb, #4f46e5);
 }
 
-/* Selectbox */
-[data-baseweb="select"] {
-    background-color: white !important;
-    border-radius: 8px !important;
-}
-
-/* Dataframe */
-[data-testid="stDataFrame"] {
-    border-radius: 10px;
-    overflow: hidden;
-}
-
 /* Download Button */
 .stDownloadButton>button {
     background: linear-gradient(90deg, #10b981, #059669);
@@ -113,6 +98,17 @@ h1, h2, h3, h4, h5, h6 {
 </style>
 """, unsafe_allow_html=True)
 
+# ------------------- Title Banner -------------------
+st.markdown("""
+<div style="background: linear-gradient(90deg,#3b82f6,#6366f1);
+padding:15px;border-radius:10px;color:white;
+font-size:20px;font-weight:600">
+🚀 AI Data Analyst Dashboard | Auto Data Analysis + ML Insights
+</div>
+""", unsafe_allow_html=True)
+
+st.title("📊 Smart Data Dashboard")
+
 # ------------------- Upload Dataset -------------------
 uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel dataset", type=["csv","xlsx"])
 df = None
@@ -121,19 +117,16 @@ numeric_cols, categorical_cols, date_cols, text_cols = [], [], [], []
 if uploaded_file:
     df = load_data(uploaded_file)
     df = clean_data(df)
-
     numeric_cols = df.select_dtypes(include='number').columns.tolist()
     categorical_cols = df.select_dtypes(include='object').columns.tolist()
-
-    # Detect date columns
-    date_cols = []
-    text_cols = []
+    
+    # Detect date and text columns
+    date_cols, text_cols = [], []
     for col in categorical_cols:
         try:
             pd.to_datetime(df[col], errors='raise')
             date_cols.append(col)
         except:
-            # Consider as text if >50% unique values
             if df[col].nunique() / len(df) > 0.5:
                 text_cols.append(col)
 
@@ -160,18 +153,20 @@ if df is not None and categorical_cols:
 
 # ------------------- Helper: Download Plotly Chart -------------------
 def download_plotly_chart(fig, filename="chart.png"):
-    buf = io.BytesIO()
-    fig.write_image(buf, format="png")
-    b64 = base64.b64encode(buf.getvalue()).decode()
-    st.download_button(
-        label="📥 Download Chart as PNG",
-        data=base64.b64decode(b64),
-        file_name=filename,
-        mime="image/png"
-    )
+    try:
+        import kaleido
+        buf = io.BytesIO()
+        fig.write_image(buf, format="png")
+        st.download_button(
+            label="📥 Download Chart as PNG",
+            data=buf.getvalue(),
+            file_name=filename,
+            mime="image/png"
+        )
+    except Exception as e:
+        st.warning("📌 Install `kaleido` to enable chart downloads.")
 
 # ------------------- Pages -------------------
-
 # Dataset Overview
 if selected_page == "Dataset Overview":
     st.header("📄 Dataset Overview")
@@ -180,7 +175,18 @@ if selected_page == "Dataset Overview":
         st.subheader("🤖 AI Insights")
         st.text(generate_insights(df))
     else:
-        st.info("Upload a dataset to see overview and insights.")
+        st.markdown("""
+            <div style="
+                background-color: #f0f0f0;  /* light gray background */
+                color: black;               /* text color black */
+                padding: 10px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 16px;
+            ">
+            👈 Upload a dataset to see overview and insights.
+            </div>
+            """, unsafe_allow_html=True)
 
 # KPI Cards
 if df is not None and numeric_cols:
