@@ -45,12 +45,13 @@ st.markdown("""
 <style>
 /* App background */
 [data-testid="stAppViewContainer"] {
-    background: linear-gradient(135deg, #f3e8ff, #d8b4fe);
+   background: linear-gradient(135deg, #a78bfa, #7c3aed);
 }
+
 
 /* Sidebar */
 [data-testid="stSidebar"] {
-    background: linear-gradient(135deg, #a78bfa, #7c3aed);
+    background: #5D3FD3;
 }
 [data-testid="stSidebar"] * {
     color: white !important;
