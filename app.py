@@ -160,14 +160,26 @@ def download_plotly_chart(fig, filename="chart.png"):
         st.warning("Install kaleido to enable downloads")
 
 # ------------------- Overview -------------------
+# Dataset Overview
 if selected_page == "Dataset Overview":
     st.header("📄 Dataset Overview")
     if df is not None:
         st.dataframe(df.head())
         st.subheader("🤖 AI Insights")
-        st.write(generate_insights(df))
+        st.text(generate_insights(df))
     else:
-        st.info("👈 Upload dataset to begin")
+        st.markdown("""
+            <div style="
+                background-color: #f0f0f0;  /* light gray background */
+                color: black;               /* text color black */
+                padding: 10px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 16px;
+            ">
+            👈 Upload a dataset to see overview and insights.
+            </div>
+            """, unsafe_allow_html=True)
 
 # ------------------- KPI -------------------
 if df is not None:
@@ -180,17 +192,46 @@ if df is not None:
 # ------------------- Visualizations -------------------
 if selected_page == "Visualizations" and numeric_cols:
     st.header("📈 Visualizations")
+
     try:
         plot_df = df.sample(min(len(df), 1500))
 
-        st.plotly_chart(plot_correlation(plot_df))
+        # Correlation
+        st.subheader("Correlation Heatmap")
+        fig_corr = plot_correlation(plot_df)
+        st.plotly_chart(fig_corr)
+        download_plotly_chart(fig_corr, "correlation_heatmap.png")
 
+        # Top N
+        st.subheader("Top N Values")
         target_col = st.selectbox("Top N Column", numeric_cols)
         top_n = st.slider("Top N", 5, 50, 10)
-        st.plotly_chart(plot_top_sales(plot_df, target_col, top_n))
 
+        fig_top = plot_top_sales(plot_df, target_col, top_n)
+        st.plotly_chart(fig_top)
+        download_plotly_chart(fig_top, "top_values.png")
+
+        # Histograms
+        st.subheader("Histograms")
         for col in numeric_cols[:5]:
-            st.plotly_chart(plot_histogram(plot_df, col))
+            fig_hist = plot_histogram(plot_df, col)
+            st.plotly_chart(fig_hist)
+            download_plotly_chart(fig_hist, f"{col}_hist.png")
+
+        # Scatter
+        if len(numeric_cols) >= 2:
+            st.subheader("Scatter Plot")
+
+            x_col = st.selectbox("X-axis", numeric_cols)
+            y_col = st.selectbox("Y-axis", numeric_cols)
+
+            color_col = None
+            if categorical_cols:
+                color_col = st.selectbox("Color by", [None] + categorical_cols)
+
+            fig_scatter = plot_scatter(plot_df, x_col, y_col, color_col)
+            st.plotly_chart(fig_scatter)
+            download_plotly_chart(fig_scatter, "scatter_plot.png")
 
     except Exception as e:
         st.error(f"Visualization Error: {e}")
