@@ -1,11 +1,17 @@
+# app.py
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import io
-import base64
-from data_analysis import load_data, clean_data
+from data_analysis import load_data, clean_data, scale_numeric
+from visualization import plot_histogram, plot_correlation, plot_scatter, plot_top_sales, plot_actual_vs_predicted
+from clustering import kmeans_clustering, calculate_elbow, silhouette_score_kmeans
+from ml_models import linear_regression
+from classification import classify_churn
+from insight import generate_insights
+import plotly.express as px
 
-# Optional Libraries
+# Optional libraries
 try:
     from wordcloud import WordCloud
     wordcloud_available = True
@@ -24,91 +30,52 @@ try:
 except ModuleNotFoundError:
     prophet_available = False
 
-# Custom Modules
-from data_analysis import load_data, clean_data
-from visualization import (
-    plot_histogram, plot_correlation, plot_scatter,
-    plot_top_sales, plot_cluster_distribution, plot_actual_vs_predicted
-)
-from clustering import kmeans_clustering, calculate_elbow, silhouette_score_kmeans
-from ml_models import linear_regression
-from classification import classify_churn
-from insight import generate_insights
-
-import plotly.express as px
-
 # ------------------- Page Config -------------------
 st.set_page_config(page_title="Enterprise AI Dashboard", page_icon="📊", layout="wide")
 
 # ------------------- PREMIUM CSS -------------------
 st.markdown("""
 <style>
-/* App background */
-[data-testid="stAppViewContainer"] {
-background: linear-gradient(#a29bfe, #6c5ce7)
-            }
-
-/* Sidebar */
-[data-testid="stSidebar"] {
-    background: #5D3FD3;
-}
-[data-testid="stSidebar"] * {
-    color: white !important;
-}
-
-/* Title */
-h1, h2, h3, h4, h5, h6 {
-    color: #1e3a8a !important;
-    font-weight: 700;
-}
-            
-
-/* KPI Cards */
-[data-testid="metric-container"] {
-    background: white;
-    border-radius: 12px;
-    padding: 15px;
-    box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
-    border-left: 5px solid #3b82f6;
-    color: black !important;
-}
-
-/* Text inside metrics / insights */
-.stText, .stMarkdown {
-    color: black !important;
-}
-
-/* Buttons */
-.stButton>button {
-    background: linear-gradient(90deg, #3b82f6, #6366f1);
-    color: white;
-    border-radius: 8px;
-    border: none;
-    font-weight: 600;
-}
-.stButton>button:hover {
-    background: linear-gradient(90deg, #2563eb, #4f46e5);
-}
-
-/* Download Button */
-.stDownloadButton>button {
-    background: linear-gradient(90deg, #10b981, #059669);
-    color: white;
-    border-radius: 8px;
-}
+[data-testid="stAppViewContainer"] {background: linear-gradient(#a29bfe, #6c5ce7)}
+[data-testid="stSidebar"] {background: #5D3FD3;}
+[data-testid="stSidebar"] * {color: white !important;}
+h1,h2,h3,h4,h5,h6 {color: #1e3a8a !important; font-weight: 700;}
+[data-testid="metric-container"] {background: white; border-radius:12px; padding:15px; box-shadow:0px 4px 15px rgba(0,0,0,0.1); border-left:5px solid #3b82f6; color:black !important;}
+.stText, .stMarkdown {color:black !important;}
+.stButton>button {background:linear-gradient(90deg,#3b82f6,#6366f1); color:white; border-radius:8px; border:none; font-weight:600;}
+.stButton>button:hover {background:linear-gradient(90deg,#2563eb,#4f46e5);}
+.stDownloadButton>button {background:linear-gradient(90deg,#10b981,#059669); color:white; border-radius:8px;}
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------- Title Banner -------------------
 st.markdown("""
-<div style="background: linear-gradient(90deg,#3b82f6,#6366f1);
-padding:15px;border-radius:10px;color:white;
-font-size:20px;font-weight:600">
+<div style="background: linear-gradient(90deg,#3b82f6,#6366f1); padding:15px;border-radius:10px;color:white; font-size:20px;font-weight:600">
 🚀 AI Data Analyst Dashboard | Auto Data Analysis + ML Insights
 </div>
 """, unsafe_allow_html=True)
 
 st.title("📊 Smart Data Dashboard")
+
+# ------------------- Helper: Caching -------------------
+@st.cache_data
+def load_and_clean(file):
+    """Load, clean, and scale data (cached for performance)"""
+    df = load_data(file)
+    df = clean_data(df)
+    df = scale_numeric(df)
+    # Limit large datasets for cloud
+    if len(df) > 5000:
+        df = df.sample(5000, random_state=42)
+    return df
+
+@st.cache_resource
+def train_regression(df, target):
+    return linear_regression(df, target)
+
+@st.cache_resource
+def train_clustering(df, n_clusters):
+    return kmeans_clustering(df, n_clusters)
 
 # ------------------- Upload Dataset -------------------
 uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel dataset", type=["csv","xlsx"])
@@ -116,11 +83,9 @@ df = None
 numeric_cols, categorical_cols, date_cols, text_cols = [], [], [], []
 
 if uploaded_file:
-    df = load_data(uploaded_file)
-    df = clean_data(df)
+    df = load_and_clean(uploaded_file)
     numeric_cols = df.select_dtypes(include='number').columns.tolist()
     categorical_cols = df.select_dtypes(include='object').columns.tolist()
-    
     # Detect date and text columns
     date_cols, text_cols = [], []
     for col in categorical_cols:
@@ -164,10 +129,11 @@ def download_plotly_chart(fig, filename="chart.png"):
             file_name=filename,
             mime="image/png"
         )
-    except Exception as e:
+    except Exception:
         st.warning("📌 Install `kaleido` to enable chart downloads.")
 
 # ------------------- Pages -------------------
+
 # Dataset Overview
 if selected_page == "Dataset Overview":
     st.header("📄 Dataset Overview")
@@ -176,18 +142,7 @@ if selected_page == "Dataset Overview":
         st.subheader("🤖 AI Insights")
         st.text(generate_insights(df))
     else:
-        st.markdown("""
-            <div style="
-                background-color: #f0f0f0;  /* light gray background */
-                color: black;               /* text color black */
-                padding: 10px;
-                border-radius: 8px;
-                font-weight: bold;
-                font-size: 16px;
-            ">
-            👈 Upload a dataset to see overview and insights.
-            </div>
-            """, unsafe_allow_html=True)
+        st.info("👈 Upload a dataset to see overview and insights.")
 
 # KPI Cards
 if df is not None and numeric_cols:
@@ -201,7 +156,6 @@ if df is not None and numeric_cols:
 # Visualizations
 if selected_page == "Visualizations" and numeric_cols:
     st.header("📈 Visualizations")
-
     if len(numeric_cols) >= 2:
         st.subheader("Correlation Heatmap")
         fig_corr = plot_correlation(df)
@@ -238,7 +192,7 @@ if selected_page == "Clustering" and len(numeric_cols) >= 2:
     st.subheader("Elbow Method")
     st.plotly_chart(calculate_elbow(df[numeric_cols], max_k=10))
 
-    clustered_df, kmeans = kmeans_clustering(df, n_clusters)
+    clustered_df, kmeans = train_clustering(df[numeric_cols], n_clusters)
     st.dataframe(clustered_df.head())
 
     score = silhouette_score_kmeans(clustered_df[numeric_cols], clustered_df['Cluster'])
@@ -251,7 +205,7 @@ if selected_page == "Clustering" and len(numeric_cols) >= 2:
 if selected_page == "Regression Predictions" and numeric_cols and len(numeric_cols) >= 2:
     st.header("🤖 Regression Predictions")
     target = st.selectbox("Select target column", numeric_cols)
-    y_test, y_pred, metrics = linear_regression(df, target)
+    y_test, y_pred, metrics = train_regression(df, target)
     st.write("Metrics:", metrics)
     pred_df = pd.DataFrame({"Actual": y_test, "Predicted": y_pred})
     st.dataframe(pred_df.head())
@@ -273,7 +227,7 @@ if selected_page == "Churn / Classification" and categorical_cols:
 if selected_page == "Time-Series Forecast" and prophet_available:
     st.header("📈 Time-Series Forecast")
     if not date_cols:
-        st.info("No valid date column detected. Time-Series Forecast is disabled for this dataset.")
+        st.info("No valid date column detected. Time-Series Forecast is disabled.")
     else:
         date_col = st.selectbox("Select Date column", date_cols)
         target_col = st.selectbox("Select numeric column to forecast", numeric_cols)
