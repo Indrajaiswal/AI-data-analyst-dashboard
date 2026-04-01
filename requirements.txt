@@ -1,11 +1,11 @@
 streamlit
 pandas
-seaborn
+numpy
+scikit-learn
 matplotlib
 plotly
+kaleido
 wordcloud
 textblob
 prophet
-scikit-learn
-numpy
-kaleido
+openpyxl

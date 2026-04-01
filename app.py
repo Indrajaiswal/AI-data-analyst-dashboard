@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import io
 import base64
+from data_analysis import load_data, clean_data
 
 # Optional Libraries
 try:
