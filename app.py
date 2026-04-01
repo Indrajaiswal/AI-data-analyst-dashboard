@@ -152,12 +152,17 @@ if df is not None and categorical_cols:
 # ------------------- Download -------------------
 def download_plotly_chart(fig, filename="chart.png"):
     try:
-        import kaleido
+        import kaleido  # make sure kaleido is imported
         buf = io.BytesIO()
         fig.write_image(buf, format="png")
-        st.download_button("📥 Download Chart", buf.getvalue(), filename)
-    except:
-        st.warning("Install kaleido to enable downloads")
+        st.download_button(
+            label="📥 Download Chart as PNG",
+            data=buf.getvalue(),
+            file_name=filename,
+            mime="image/png"
+        )
+    except Exception as e:
+        st.warning("📌 Install `kaleido` to enable chart downloads.")
 
 # ------------------- Overview -------------------
 # Dataset Overview
