@@ -1,15 +1,17 @@
-# app.py
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import io
-from data_analysis import load_data, clean_data, scale_numeric
-from visualization import plot_histogram, plot_correlation, plot_scatter, plot_top_sales, plot_actual_vs_predicted
+from data_analysis import load_data, clean_data, scale_numeric, get_column_types
+from visualization import (
+    plot_histogram, plot_correlation, plot_scatter,
+    plot_top_sales, plot_actual_vs_predicted
+)
 from clustering import kmeans_clustering, calculate_elbow, silhouette_score_kmeans
 from ml_models import linear_regression
 from classification import classify_churn
 from insight import generate_insights
-import plotly.express as px
+import numpy as np
 
 # Optional libraries
 try:
@@ -33,68 +35,46 @@ except ModuleNotFoundError:
 # ------------------- Page Config -------------------
 st.set_page_config(page_title="Enterprise AI Dashboard", page_icon="📊", layout="wide")
 
-# ------------------- PREMIUM CSS -------------------
+# ------------------- CSS -------------------
 st.markdown("""
 <style>
-[data-testid="stAppViewContainer"] {background: linear-gradient(#a29bfe, #6c5ce7)}
-[data-testid="stSidebar"] {background: #5D3FD3;}
-[data-testid="stSidebar"] * {color: white !important;}
-h1,h2,h3,h4,h5,h6 {color: #1e3a8a !important; font-weight: 700;}
-[data-testid="metric-container"] {background: white; border-radius:12px; padding:15px; box-shadow:0px 4px 15px rgba(0,0,0,0.1); border-left:5px solid #3b82f6; color:black !important;}
-.stText, .stMarkdown {color:black !important;}
-.stButton>button {background:linear-gradient(90deg,#3b82f6,#6366f1); color:white; border-radius:8px; border:none; font-weight:600;}
-.stButton>button:hover {background:linear-gradient(90deg,#2563eb,#4f46e5);}
-.stDownloadButton>button {background:linear-gradient(90deg,#10b981,#059669); color:white; border-radius:8px;}
+/* App background */
+[data-testid="stAppViewContainer"] {
+background: linear-gradient(#a29bfe, #6c5ce7)
+            }
+/* Sidebar */
+[data-testid="stSidebar"] { background: #5D3FD3; }
+[data-testid="stSidebar"] * { color: white !important; }
+/* KPI Cards */
+[data-testid="metric-container"] { background: white; border-radius: 12px; padding: 15px;
+box-shadow: 0px 4px 15px rgba(0,0,0,0.1); border-left: 5px solid #3b82f6; color: black !important;}
+/* Buttons */
+.stButton>button { background: linear-gradient(90deg, #3b82f6, #6366f1); color: white; border-radius: 8px; border: none; font-weight: 600; }
+.stButton>button:hover { background: linear-gradient(90deg, #2563eb, #4f46e5); }
+.stDownloadButton>button { background: linear-gradient(90deg, #10b981, #059669); color: white; border-radius: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------- Title Banner -------------------
-st.markdown("""
-<div style="background: linear-gradient(90deg,#3b82f6,#6366f1); padding:15px;border-radius:10px;color:white; font-size:20px;font-weight:600">
-🚀 AI Data Analyst Dashboard | Auto Data Analysis + ML Insights
-</div>
-""", unsafe_allow_html=True)
-
-st.title("📊 Smart Data Dashboard")
-
-# ------------------- Helper: Caching -------------------
+# ------------------- Cached Data Loading -------------------
 @st.cache_data
-def load_and_clean(file):
-    """Load, clean, and scale data (cached for performance)"""
+def load_clean_scale(file):
     df = load_data(file)
     df = clean_data(df)
     df = scale_numeric(df)
-    # Limit large datasets for cloud
-    if len(df) > 5000:
-        df = df.sample(5000, random_state=42)
     return df
 
-@st.cache_resource
-def train_regression(df, target):
-    return linear_regression(df, target)
-
-@st.cache_resource
-def train_clustering(df, n_clusters):
-    return kmeans_clustering(df, n_clusters)
-
-# ------------------- Upload Dataset -------------------
+# ------------------- File Upload -------------------
 uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel dataset", type=["csv","xlsx"])
 df = None
 numeric_cols, categorical_cols, date_cols, text_cols = [], [], [], []
 
 if uploaded_file:
-    df = load_and_clean(uploaded_file)
-    numeric_cols = df.select_dtypes(include='number').columns.tolist()
-    categorical_cols = df.select_dtypes(include='object').columns.tolist()
-    # Detect date and text columns
-    date_cols, text_cols = [], []
-    for col in categorical_cols:
-        try:
-            pd.to_datetime(df[col], errors='raise')
-            date_cols.append(col)
-        except:
-            if df[col].nunique() / len(df) > 0.5:
-                text_cols.append(col)
+    df = load_clean_scale(uploaded_file)
+    numeric_cols, categorical_cols, date_cols, text_cols = get_column_types(df)
+
+    # Limit dataset for speed on Streamlit Cloud
+    if len(df) > 5000:
+        df = df.sample(5000, random_state=42)
 
 # ------------------- Dynamic Pages -------------------
 pages = ["Dataset Overview"]
@@ -117,20 +97,15 @@ if df is not None and categorical_cols:
         selected = st.sidebar.multiselect(f"{col} filter", options, default=options)
         df = df[df[col].isin(selected)]
 
-# ------------------- Helper: Download Plotly Chart -------------------
+# ------------------- Helper for Download -------------------
 def download_plotly_chart(fig, filename="chart.png"):
     try:
         import kaleido
         buf = io.BytesIO()
         fig.write_image(buf, format="png")
-        st.download_button(
-            label="📥 Download Chart as PNG",
-            data=buf.getvalue(),
-            file_name=filename,
-            mime="image/png"
-        )
+        st.download_button(label="📥 Download Chart", data=buf.getvalue(), file_name=filename, mime="image/png")
     except Exception:
-        st.warning("📌 Install `kaleido` to enable chart downloads.")
+        st.warning("Install `kaleido` to enable chart downloads.")
 
 # ------------------- Pages -------------------
 
@@ -153,59 +128,51 @@ if df is not None and numeric_cols:
     col3.metric("Categorical Columns", len(categorical_cols))
     col4.metric("Date Columns", len(date_cols))
 
-# Visualizations
+# ------------------- Visualizations -------------------
 if selected_page == "Visualizations" and numeric_cols:
     st.header("📈 Visualizations")
+    plot_df = df.sample(min(len(df), 2000), random_state=42)
     if len(numeric_cols) >= 2:
         st.subheader("Correlation Heatmap")
-        fig_corr = plot_correlation(df)
+        fig_corr = plot_correlation(plot_df)
         st.plotly_chart(fig_corr)
         download_plotly_chart(fig_corr, "correlation_heatmap.png")
 
-    st.subheader("Top N Values")
-    target_col = st.selectbox("Select numeric column for Top N chart", numeric_cols)
-    top_n = st.slider("Top N values", 5, 50, 10)
-    fig_top = plot_top_sales(df, target_col=target_col, top_n=top_n)
-    st.plotly_chart(fig_top)
-    download_plotly_chart(fig_top, "top_n_values.png")
-
     st.subheader("Histograms")
     for col in numeric_cols:
-        fig_hist = plot_histogram(df, col)
+        fig_hist = plot_histogram(plot_df, col)
         st.plotly_chart(fig_hist)
 
     if len(numeric_cols) >= 2:
         st.subheader("Scatter Plot")
-        x_col = st.selectbox("X-axis column", numeric_cols)
-        y_col = st.selectbox("Y-axis column", numeric_cols)
+        x_col = st.selectbox("X-axis", numeric_cols)
+        y_col = st.selectbox("Y-axis", numeric_cols)
         color_col = None
         if categorical_cols:
-            color_col = st.selectbox("Color by categorical column (optional)", [None]+categorical_cols)
-        fig_scatter = plot_scatter(df, x_col, y_col, color_col)
+            color_col = st.selectbox("Color by (optional)", [None] + categorical_cols)
+        fig_scatter = plot_scatter(plot_df, x_col, y_col, color_col)
         st.plotly_chart(fig_scatter)
         download_plotly_chart(fig_scatter, "scatter_plot.png")
 
-# Clustering
+# ------------------- Clustering -------------------
 if selected_page == "Clustering" and len(numeric_cols) >= 2:
     st.header("📌 KMeans Clustering")
     n_clusters = st.slider("Number of clusters", 2, 10, 3)
     st.subheader("Elbow Method")
     st.plotly_chart(calculate_elbow(df[numeric_cols], max_k=10))
 
-    clustered_df, kmeans = train_clustering(df[numeric_cols], n_clusters)
+    clustered_df, kmeans = kmeans_clustering(df, n_clusters)
     st.dataframe(clustered_df.head())
-
     score = silhouette_score_kmeans(clustered_df[numeric_cols], clustered_df['Cluster'])
     st.info(f"Silhouette Score: {score:.4f}")
-
     fig_clusters = plot_scatter(clustered_df, numeric_cols[0], numeric_cols[1], color_col='Cluster')
     st.plotly_chart(fig_clusters)
 
-# Regression Predictions
+# ------------------- Regression -------------------
 if selected_page == "Regression Predictions" and numeric_cols and len(numeric_cols) >= 2:
     st.header("🤖 Regression Predictions")
-    target = st.selectbox("Select target column", numeric_cols)
-    y_test, y_pred, metrics = train_regression(df, target)
+    target = st.selectbox("Target Column", numeric_cols)
+    y_test, y_pred, metrics = linear_regression(df, target)
     st.write("Metrics:", metrics)
     pred_df = pd.DataFrame({"Actual": y_test, "Predicted": y_pred})
     st.dataframe(pred_df.head())
@@ -213,24 +180,24 @@ if selected_page == "Regression Predictions" and numeric_cols and len(numeric_co
     st.plotly_chart(fig_pred)
     download_plotly_chart(fig_pred, "regression_predictions.png")
 
-# Churn / Classification
+# ------------------- Classification -------------------
 if selected_page == "Churn / Classification" and categorical_cols:
     st.header("🤖 Churn / Classification")
-    target_col = st.selectbox("Select target column", categorical_cols)
+    target_col = st.selectbox("Target Column", categorical_cols)
     y_test, y_pred, metrics, feat_imp = classify_churn(df, target_col)
-    st.write("Classification Metrics:", metrics)
+    st.write("Metrics:", metrics)
     st.bar_chart(feat_imp)
     st.subheader("Predictions Preview")
     st.dataframe(pd.DataFrame({"Actual": y_test, "Predicted": y_pred}).head())
 
-# Time-Series Forecast
+# ------------------- Time-Series Forecast -------------------
 if selected_page == "Time-Series Forecast" and prophet_available:
     st.header("📈 Time-Series Forecast")
     if not date_cols:
-        st.info("No valid date column detected. Time-Series Forecast is disabled.")
+        st.info("No date column detected for forecast.")
     else:
-        date_col = st.selectbox("Select Date column", date_cols)
-        target_col = st.selectbox("Select numeric column to forecast", numeric_cols)
+        date_col = st.selectbox("Date Column", date_cols)
+        target_col = st.selectbox("Numeric Column to Forecast", numeric_cols)
         try:
             forecast_df, fig_forecast = forecast_time_series(df, date_col, target_col)
             st.plotly_chart(fig_forecast)
@@ -240,17 +207,17 @@ if selected_page == "Time-Series Forecast" and prophet_available:
         except ValueError as e:
             st.error(str(e))
 
-# Text / NLP Analysis
+# ------------------- Text / NLP Analysis -------------------
 if selected_page == "Text / NLP Analysis" and wordcloud_available:
     st.header("📰 Text / NLP Analysis")
-    text_col = st.selectbox("Select text column", text_cols)
+    text_col = st.selectbox("Text Column", text_cols)
     st.subheader("Text Sample")
     st.dataframe(df[text_col].head())
 
     # WordCloud
     text_data = " ".join(df[text_col].astype(str))
     wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text_data)
-    fig, ax = plt.subplots(figsize=(10,5))
+    fig, ax = plt.subplots(figsize=(10, 5))
     ax.imshow(wordcloud, interpolation='bilinear')
     ax.axis('off')
     st.pyplot(fig)

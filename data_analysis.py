@@ -2,69 +2,49 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
-
-# ------------------ LOAD DATA ------------------
 def load_data(file):
-    """Load CSV or Excel file safely"""
-    try:
-        if file.name.endswith(".csv"):
-            df = pd.read_csv(file)
-        else:
-            df = pd.read_excel(file)
-        return df
-    except Exception as e:
-        raise ValueError(f"Error loading file: {e}")
+    """Load CSV or Excel file."""
+    if file.name.endswith(".csv"):
+        df = pd.read_csv(file)
+    else:
+        df = pd.read_excel(file)
+    return df
 
-
-# ------------------ CLEAN DATA ------------------
 def clean_data(df):
-    """Clean dataset: remove duplicates, fix types, handle missing values"""
-
-    df = df.copy()
-
-    # Clean column names
-    df.columns = df.columns.str.strip()
-
-    # Remove duplicates
+    """Remove duplicates and fill missing values intelligently."""
     df = df.drop_duplicates()
-
     for col in df.columns:
-
-        # ✅ SAFE numeric conversion (fix for pandas error)
-        try:
-            df[col] = pd.to_numeric(df[col])
-        except:
-            pass
-
-        # Handle missing values
-        if df[col].dtype == 'object':
-            # Categorical/Text
-            if df[col].isnull().sum() > 0:
-                if not df[col].mode().empty:
-                    df[col] = df[col].fillna(df[col].mode()[0])
-                else:
-                    df[col] = df[col].fillna("Unknown")
+        if df[col].dtype == "string" or df[col].dtype == object:
+            if df[col].isna().sum() > 0:
+                df[col].fillna(df[col].mode()[0], inplace=True)
         else:
-            # Numeric
-            if df[col].isnull().sum() > 0:
-                if df[col].notnull().sum() > 0:
-                    df[col] = df[col].fillna(df[col].median())
-                else:
-                    df[col] = df[col].fillna(0)
-
+            if df[col].isna().sum() > 0:
+                df[col].fillna(df[col].median(), inplace=True)
     return df
 
-
-# ------------------ SCALE NUMERIC ------------------
 def scale_numeric(df):
-    """Scale numeric columns using StandardScaler"""
-
-    df = df.copy()
-
+    """Scale numeric columns."""
     numeric_cols = df.select_dtypes(include=np.number).columns
-
-    if len(numeric_cols) > 0:
-        scaler = StandardScaler()
-        df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
-
+    scaler = StandardScaler()
+    df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
     return df
+
+def get_column_types(df):
+    """Detect numeric, categorical, date, and text columns."""
+    numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+    # Use string for pandas 3.x compatibility
+    categorical_cols = df.select_dtypes(include="string").columns.tolist()
+
+    date_cols, text_cols = [], []
+    for col in df.columns:
+        try:
+            parsed = pd.to_datetime(df[col], errors="coerce", format="%Y-%m-%d")
+            if parsed.notna().sum() > 0:
+                date_cols.append(col)
+            elif df[col].dtype == "string":
+                # Consider high-cardinality strings as text
+                if df[col].nunique() / len(df) > 0.5:
+                    text_cols.append(col)
+        except Exception:
+            continue
+    return numeric_cols, categorical_cols, date_cols, text_cols
