@@ -2,19 +2,23 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
+
 # ------------------ LOAD DATA ------------------
 def load_data(file):
-    """Load CSV or Excel"""
-    if file.name.endswith(".csv"):
-        df = pd.read_csv(file)
-    else:
-        df = pd.read_excel(file)
-    return df
+    """Load CSV or Excel file safely"""
+    try:
+        if file.name.endswith(".csv"):
+            df = pd.read_csv(file)
+        else:
+            df = pd.read_excel(file)
+        return df
+    except Exception as e:
+        raise ValueError(f"Error loading file: {e}")
 
 
 # ------------------ CLEAN DATA ------------------
 def clean_data(df):
-    """Remove duplicates, fix data types, and handle missing values"""
+    """Clean dataset: remove duplicates, fix types, handle missing values"""
 
     df = df.copy()
 
@@ -26,19 +30,22 @@ def clean_data(df):
 
     for col in df.columns:
 
-        # 🔥 Convert numeric-like strings to numbers
-        df[col] = pd.to_numeric(df[col], errors='ignore')
+        # ✅ SAFE numeric conversion (fix for pandas error)
+        try:
+            df[col] = pd.to_numeric(df[col])
+        except:
+            pass
 
+        # Handle missing values
         if df[col].dtype == 'object':
-            # Categorical column
+            # Categorical/Text
             if df[col].isnull().sum() > 0:
                 if not df[col].mode().empty:
                     df[col] = df[col].fillna(df[col].mode()[0])
                 else:
                     df[col] = df[col].fillna("Unknown")
-
         else:
-            # Numeric column
+            # Numeric
             if df[col].isnull().sum() > 0:
                 if df[col].notnull().sum() > 0:
                     df[col] = df[col].fillna(df[col].median())
@@ -48,9 +55,9 @@ def clean_data(df):
     return df
 
 
-# ------------------ SCALE DATA ------------------
+# ------------------ SCALE NUMERIC ------------------
 def scale_numeric(df):
-    """Scale numeric columns safely"""
+    """Scale numeric columns using StandardScaler"""
 
     df = df.copy()
 
