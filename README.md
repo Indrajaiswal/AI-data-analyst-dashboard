@@ -102,4 +102,8 @@ https://ai-data-analyst-dashboard-ptkymvsappfff8pvytclvqo.streamlit.app/
 
 
 
-
+## 📸 Screenshots
+![Dashboard Screenshot](photos/1.png)
+![Dashboard Screenshot](photos/2.png)
+![Dashboard Screenshot](photos/3.png)
+![Dashboard Screenshot](photos/4.png)
