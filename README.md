@@ -102,5 +102,4 @@ https://ai-data-analyst-dashboard-ptkymvsappfff8pvytclvqo.streamlit.app/
 
 
 
-## ### Dashboard Demo Video
-[Download & Watch Video](MP4/AI Data analystmp4)
+
